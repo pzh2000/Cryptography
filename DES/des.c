@@ -152,28 +152,111 @@ int BitToChar(char bin[64], char str[8])
 }
 
 //Generate sub-keys
-int GenSubKey(char key[64], char subkey[16][48]);
+int GenSubKey(char key[64], char subkey[16][48])
+{
+	char temp[56];
+	int count;
+	DES_PC1(key, temp); //Do the permutation using Permuted Choice 1
+	for(count = 0; count < 16; count++)//Iterate 16 rounds in order to generate 16 sub-keys
+	{
+		Left_Cir_Shift(temp, circular_shift[count]);
+	}
+	return 0;
+}
 
 //Implementation of Permuted Choice 1
-int DES_PC1(char key[64], char key_pc1[56]);
+int DES_PC1(char key[64], char key_pc1[56])
+{
+	int count;
+	for(count = 0; count < 56; count++)
+	{
+		key_pc1[count] = key[PC_1[count]];
+	}
+	return 0;
+}
 
 //Implementaton of Permuted Choice 2
-int DES_PC2(char key[56], char key_pc2[48]);
+int DES_PC2(char key[56], char key_pc2[48])
+{
+	int count;
+	for(count = 0; count < 48; count++)
+	{
+		key_pc2[count] = key[PC_2[count]];
+	}
+	return 0;
+}
 
 //Left circular shift
-int left_cir_shift(char key[56], int t);
+int Left_Cir_Shift(char key[56], int t)
+{
+	char temp[56];
+
+	//Save the bits which will be moved to the right
+	memcpy(temp, data, t);
+	memcpy(temp + t, data + 28, t);
+
+	//Move 28 bits forward
+	memcpy(data, data + t, 28 - t);
+	memcpy(data + 28 - t, temp, t);
+
+	//Move 28 bits backward
+	memcpy(data + 28, data + 28 + t, 28 - t);
+	memcpy(data + 56 - t, temp + t, t);
+
+	return 0;
+}
 
 //Initial permutation
-int DES_IP(char data[64]);
+int DES_IP(char data[64])
+{
+	int count;
+	char temp[64];
+	for(count = 0; count < 64; count++)
+	{
+		temp[count] = data[IP_table[count]];
+	}
+	memcpy(data, temp, 64);
+	return 0;
+}
 
 //Inverse of inital permutation
-int DES_IP_inv(char data[64]);
+int DES_IP_inv(char data[64])
+{
+	int count;
+	char temp[64];
+	for(count = 0; count < 64; count++)
+	{
+		temp[count] = data[IP_inv_table[count]];
+	}
+	memcpy(data, temp, 64);
+	return 0;
+}
 
 //Expansion
-int DES_Exp(char data[32]);
+int DES_Exp(char data[32])
+{
+	int count;
+	char temp[48];
+	for(count = 0; count < 48; count++)
+	{
+		temp[count] = data[E_Table[count]];
+	}
+	memcpy(data, temp, 64);
+	return 0;
+}
 
 //Permutation in the F function
-int DES_Per(char data[32]);
+int DES_Per(char data[32])
+{
+	int count;
+	char temp[32];
+	for(count = 0; count < 32; count++)
+	{
+		temp[count] = data[P_Table[count]];
+	}
+	memcpy(data, temp, 32);
+	return 0;
+}
 
 //XOR
 int DES_XOR(char R[48], char L[48], int count);

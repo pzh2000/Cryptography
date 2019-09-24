@@ -25,7 +25,7 @@ int DES_PC1(char key[64], char key_pc1[56]);
 int DES_PC2(char key[56], char key_pc2[48]);
 
 //Left circular shift
-int left_cir_shift(char key[56], int t);
+int Left_Cir_Shift(char key[56], int t);
 
 //Initial permutation
 int DES_IP(char data[64]);
