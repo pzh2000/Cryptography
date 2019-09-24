@@ -107,24 +107,49 @@ int PC_2[48] = {13, 16, 10, 23, 0, 4,
 //Times of left circular shift
 int circular_shift[16] = {1, 1, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 1};
 
-//Convert Byte into binary bits
+//Convert Byte into 8 bits binary number array
 int ByteToBit(char ch, char bin[8])
 {
 	int count;
 	for(count = 0; count < 8; count++)
 	{
-		bin[count] = (ch >> count) & 1;
+		*(bin + count) = (ch >> count) & 1;
 	}
+	return 0;
 }
 
 //Convert binary bits into Byte
-int BitToByte(char bin[8], char *ch);
+int BitToByte(char bin[8], char *ch)
+{
+    int count;
+    for(count = 0; count < 8; count++)
+    {
+        *ch |= *(bin + count) << count;
+    }
+    return 0;
+}
 
 //Convert 8 Byte string into 64 bit binary numbers
-int CharToBit(char str[8], char bin[64]);
+int CharToBit(char str[8], char bin[64])
+{
+    int count;
+    for(count = 0; count < 8; count++)
+    {
+        ByteToBit(*(str + count), (bin + (count << 3)));
+    }
+    return 0;
+}
 
 //Convert 64 bit binary numbers into 8 Byte string
-int BitToChar(char bin[64], char str[8]);
+int BitToChar(char bin[64], char str[8])
+{
+    int count;
+    for(count = 0; count < 8; count++)
+    {
+        BitToByte((bit + (count << 3)), ch + count);
+    }
+    return 0;
+}
 
 //Generate sub-keys
 int GenSubKey(char key[64], char subkey[16][48]);
