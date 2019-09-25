@@ -1,5 +1,7 @@
 //des.c
 //Implementation of DES encryption and decryption
+#include <string.h>
+#include <stdio.h>
 #include "des.h"
 
 //Initial permutation table
@@ -336,17 +338,96 @@ int DES_EncryptBlock(char plain[8], char subKey[16][48], char cipher[8])
 			DES_Swap(plainBit, plainBit + 32);
 		}
 	}
-	//Do the inversed Permutation
+	//Do the inversed Initial Permutation
 	DES_IP_inv(plainBit);
 	BitToChar(plainBit, cipher);
 	return 0;
 }
 
 //Decrypt a single block
-int DES_DecryptBlock(char cipher[8], char subKey[16][48], char plain[8]);
+int DES_DecryptBlock(char cipher[8], char subKey[16][48], char plain[8])
+{
+	char cipherBit[64];
+	char rightHalf[48];
+	int count;
+
+	CharToBit(cipher, cipherBit);
+	//Initial permutation
+	DES_IP(cipherBit);
+
+	//16 rounds of iteration
+	for(count = 15; count >= 0; count--)
+	{
+		//Expand the right half of the cipertext
+		memcpy(rightHalf, cipherBit + 32, 32);
+		DES_Exp(rightHalf);
+		//Right half XOR with key
+		DES_XOR(rightHalf, subKey[count], 48);
+		//Put the result into the S-Box, then we will get a 32-bit result
+		DES_SBox(rightHalf);
+		//Permutation within the round function
+		DES_Per(rightHalf);
+		//Left half of the plain bits XOR with the right half
+		DES_XOR(cipherBit, rightHalf, 32);
+		//Swap the two sides of data
+		if(count != 0)
+		{
+			DES_Swap(cipherBit, cipherBit + 32);
+		}
+	}
+	//Do the inversed Initial Permutation
+	DES_IP_inv(cipherBit);
+	BitToChar(cipherBit, plain);
+	return 0;
+}
 
 //Encrypt the file
-int DES_Encrypt(char *plain, char *key, char *cipher);
+int DES_Encrypt(char *pFile, char *key, char *cFile)
+{
+	FILE *cipher, *plain;
+	int count;
+	char plainBlock[8], cipherBlock[8], keyBlock[8];
+	char binKey[64];
+	char subKey[16][48];
+	if((plain = fopen(pFile,"rb")) == NULL)
+	{
+		return -1;
+	}
+	if((cipher = fopen(cFile, "wb")) == NULL)
+	{
+		return -3;
+	}
+	//Setup the key
+	memcpy(keyBlock, key, 8);
+	//Convert the key into binary bits
+	CharToBit(keyBlock, binKey);
+	//Generate the sub-key
+	GenSubKey(binKey, subKey);
+
+	while(!feof(plain))
+	{
+		//Read 8 bytes everytime, and return the number of the bytes had been read
+		if((count = fread(plainBlock, sizeof(char), 8, plain)) == 8)
+		{
+			DES_EncryptBlock(plainBlock, subKey, cipherBlock);
+			fwrite(cipherBlock, sizeof(char), 8, cipher);
+		}
+	}
+
+	if(count)
+	{
+		//Fill the blanks
+		memset(plainBlock + count, '\0', 7 - count);
+		//Save the last char include the number of chars filled
+		plainBlock[7] = 8 - count;
+		DES_EncryptBlock(plainBlock, subKey, cipherBlock);
+		fwrite(cipherBlock, sizeof(char), 8, cipher);
+	}
+
+	fclose(plain);
+	fclose(cipher);
+	return 1;
+}
 
 //Decrypt the file
 int DES_Decrypt(char *cipher, char *key, char *plain);
