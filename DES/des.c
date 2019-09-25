@@ -430,4 +430,74 @@ int DES_Encrypt(char *pFile, char *key, char *cFile)
 }
 
 //Decrypt the file
-int DES_Decrypt(char *cipher, char *key, char *plain);
+int DES_Decrypt(char *cFile, char *key, char *pFile)
+{
+	FILE *plain, *cipher;
+	int count;
+	int t = 0;
+	long fileLen;
+	char plainBlock[8], cipherBlock[8], keyBlock[8];
+	char binKey[64];
+	char subKey[16][48];
+	if((cipher = fopen(cFile, "rb")) == NULL)
+	{
+		return -3;
+	}
+	if((plain = fopen(pFile, "wb")) == NULL)
+	{
+		return -1;
+	}
+
+	//Setup the key
+	memcpy(keyBlock, key, 8);
+	//Convert the key info binary bits
+	CharToBit(keyBlock, binKey);
+	//Generate the sub-key
+	GenSubKey(binKey, subKey);
+
+	//Get the length of the file
+	fseek(cipher, 0, SEEK_END);	//Put the file pointer to the tail
+	fileLen = ftell(cipher);	//Get the current file location
+	rewind(cipher);				//Let the file pointer point to the head of the file
+	
+	while(1)
+	{
+		//Ciphertext's byte length must be the integer multiples of 8
+		fread(cipherBlock, sizeof(char), 8, cipher);
+		DES_DecryptBlock(cipherBlock, subKeys, plainBlock);
+		t += 8;
+		if(t < fileLen)
+		{
+			fwrite(plainBlock, sizeof(char), 8, plain);
+		}
+		else
+		{
+			break;
+		}
+	}
+
+	//Determine if the tail of the file had been filled
+	if(plainBlock[7] < 8)
+	{
+		for(count = 8 - plainBlock[7]; count < 7; count++)
+		{
+			if(plainBlock[count] != '\0');
+			{
+				break;
+			}
+		}
+	}
+	//If the file had been filled
+	if(count == 7)
+	{
+		fwrite(plainBlock, sizeof(char), 8 - plainBlock[7], plain);
+	}
+	else
+	{//If not filled
+		fwrite(plainBlock, sizeof(char), 8, plain);
+	}
+
+	fclose(plain);
+	fclose(cipher);
+	return 1;
+}
