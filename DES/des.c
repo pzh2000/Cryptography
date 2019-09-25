@@ -259,16 +259,88 @@ int DES_Per(char data[32])
 }
 
 //XOR
-int DES_XOR(char R[48], char L[48], int count);
+int DES_XOR(char R[48], char L[48], int t)
+{
+	int count;
+	for(count = 0; count < t; count++)
+	{
+		R[count] ^= L[count];
+	}
+	return 0;
+}
 
 //S-Box permutation
-int DES_SBox(char data[48]);
+int DES_SBox(char data[48])
+{
+	int count;
+	int col, row, consequence;
+	int num1, num2;
+	for(count = 0; count < 8; count++)
+	{
+		num1 = count * 6;
+		num2 = count << 2;
+
+		//Calculate the row and column in S-Box
+		col = (dat[num1] << 1) + data[num1 + 5];
+		row = (data[num1 + 1] << 3) + (data[num1 + 2] << 2)
+			   + (data[num1 + 3] << 1) + data[num1 + 4];
+		consequence = S_Box[count][col][row];
+
+		//Convert into binary numbers
+		data[num2] = (consequence & 0X08) >> 3;
+		data[num2 + 1] = (consequence & 0X04) >> 2;
+		data[num2 + 2] = (consequence & 0X02) >>1;
+		data[num2 + 3] = consequence & 0X01;
+	}
+	return 0;
+}
 
 //Swap function
-int DES_Swap(char L[32], char R[32]);
+int DES_Swap(char L[32], char R[32])
+{
+	char temp[32];
+	memcpy(temp, L, 32);
+	memcpy(left, right, 32);
+	memcpy(right, temp, 32);
+	return 0;
+}
 
 //Encrypt a single block
-int DES_EncryptBlock(char plain[8], char subKey[16][48], char cipher[8]);
+int DES_EncryptBlock(char plain[8], char subKey[16][48], char cipher[8])
+{
+	char plainBit[64];
+	char rightHalf[48];
+	int count;
+
+	CharToBit(plain, plainBit);
+	//Initial permutation
+	DES_IP(plainBit);
+
+	//16 rounds of iteration
+	for(count = 0; count < 16; count++)
+	{
+		//Copy the right half of the plain bits and do the expansion
+		memcpy(rightHalf, plainBit + 32, 32);
+		DES_Exp(rightHalf);
+		//Right half XOR with key
+		DES_XOR(rightHalf, subKey[count], 48);
+		//Put the XORed data into the S-Box, get a 32-bit result
+		DES_SBox(rightHalf);
+		//Permutation within the round function
+		DES_Per(rightHalf);
+		//Left half of the plain bits XOR with the right half
+		DES_XOR(plainBit, rightHalf, 32);
+		//Swap the two sides of data
+		if(count != 15)
+		{
+			DES_Swap(plainBit, plainBit + 32);
+		}
+	}
+	//Do the inversed Permutation
+	DES_IP_inv(plainBit);
+	BitToChar(plainBit, cipher);
+	return 0;
+}
 
 //Decrypt a single block
 int DES_DecryptBlock(char cipher[8], char subKey[16][48], char plain[8]);
