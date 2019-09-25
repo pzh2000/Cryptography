@@ -34,7 +34,7 @@ int E_Table[48] =  {31, 0, 1, 2, 3, 4,
 
 //S-Box
 int S_Box[8][4][16] = {//S1
-						{{14, 4, 13, 1, 2, 15, 11, 8, 3, 10, 6, 12, 5, 9, 0 7},
+						{{14, 4, 13, 1, 2, 15, 11, 8, 3, 10, 6, 12, 5, 9, 0, 7},
 						 {0, 15, 7, 4, 14, 2, 13, 1, 10, 6, 12, 11, 9, 5, 3, 8},
 						 {4, 1, 14, 8, 13, 6, 2, 11, 15, 12, 9, 7, 3, 10, 5, 0},
 						 {15, 12, 8, 2, 4, 9, 1, 7, 5, 11, 3, 14, 10, 0, 6,13}},
@@ -44,7 +44,7 @@ int S_Box[8][4][16] = {//S1
 						 {0, 14, 7, 11, 10, 4, 13, 1, 5, 8, 12, 6, 9, 3, 2, 15},
 						 {13, 8, 10, 1, 3, 15, 4, 2, 11, 6, 7, 12, 0, 5, 14, 9}},
 						//S3
-						{{10, 0 9, 14, 6, 3, 15, 5, 1, 13, 12, 7, 11, 4, 2, 8},
+						{{10, 0, 9, 14, 6, 3, 15, 5, 1, 13, 12, 7, 11, 4, 2, 8},
 						 {13, 7, 0, 9, 3, 4, 6, 10, 2, 8, 5, 14, 12, 11, 15, 1},
 						 {13, 6, 4, 9, 8, 15, 3, 0, 11, 1, 2, 12, 5, 10, 14, 7},
 						 {1, 10, 13, 0, 6, 9, 8, 7, 4, 15, 14, 3, 11, 5, 2, 12}},
@@ -146,7 +146,7 @@ int BitToChar(char bin[64], char str[8])
     int count;
     for(count = 0; count < 8; count++)
     {
-        BitToByte((bit + (count << 3)), ch + count);
+        BitToByte((bin + (count << 3)), str + count);
     }
     return 0;
 }
@@ -192,16 +192,16 @@ int Left_Cir_Shift(char key[56], int t)
 	char temp[56];
 
 	//Save the bits which will be moved to the right
-	memcpy(temp, data, t);
-	memcpy(temp + t, data + 28, t);
+	memcpy(temp, key, t);
+	memcpy(temp + t, key + 28, t);
 
 	//Move 28 bits forward
-	memcpy(data, data + t, 28 - t);
-	memcpy(data + 28 - t, temp, t);
+	memcpy(key, key + t, 28 - t);
+	memcpy(key + 28 - t, temp, t);
 
 	//Move 28 bits backward
-	memcpy(data + 28, data + 28 + t, 28 - t);
-	memcpy(data + 56 - t, temp + t, t);
+	memcpy(key + 28, key + 28 + t, 28 - t);
+	memcpy(key + 56 - t, temp + t, t);
 
 	return 0;
 }
@@ -281,7 +281,7 @@ int DES_SBox(char data[48])
 		num2 = count << 2;
 
 		//Calculate the row and column in S-Box
-		col = (dat[num1] << 1) + data[num1 + 5];
+		col = (data[num1] << 1) + data[num1 + 5];
 		row = (data[num1 + 1] << 3) + (data[num1 + 2] << 2)
 			   + (data[num1 + 3] << 1) + data[num1 + 4];
 		consequence = S_Box[count][col][row];
@@ -300,8 +300,8 @@ int DES_Swap(char L[32], char R[32])
 {
 	char temp[32];
 	memcpy(temp, L, 32);
-	memcpy(left, right, 32);
-	memcpy(right, temp, 32);
+	memcpy(L, R, 32);
+	memcpy(R, temp, 32);
 	return 0;
 }
 
