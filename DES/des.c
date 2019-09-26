@@ -464,7 +464,7 @@ int DES_Decrypt(char *cFile, char *key, char *pFile)
 	{
 		//Ciphertext's byte length must be the integer multiples of 8
 		fread(cipherBlock, sizeof(char), 8, cipher);
-		DES_DecryptBlock(cipherBlock, subKeys, plainBlock);
+		DES_DecryptBlock(cipherBlock, subKey, plainBlock);
 		t += 8;
 		if(t < fileLen)
 		{
@@ -481,7 +481,7 @@ int DES_Decrypt(char *cFile, char *key, char *pFile)
 	{
 		for(count = 8 - plainBlock[7]; count < 7; count++)
 		{
-			if(plainBlock[count] != '\0');
+			if(plainBlock[count] != '\0')
 			{
 				break;
 			}

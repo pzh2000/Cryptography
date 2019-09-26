@@ -21,16 +21,16 @@
 int main(int argc, char *argv[])
 {
     //Check if the input is the correct form
-    if(argc < 2 || argc > 4)
+    if(argc < 2 || argc > 5)
     {
-        puts("You muct provide at lease 1 parameter, and no more than 4 parameters\n");
+        puts("You must provide at lease 1 parameter, and no more than 4 parameters\n");
         return 1;
     }
 
     //Get the flag, and start doing corresponding operation
     if(strcmp(argv[1], ENCRYPT) == 0)
     {
-        //TODO: Encrypt the file
+        DES_Encrypt(argv[2], argv[3], argv[4]);
     }
     else if(strcmp(argv[1], DECRYPT) == 0)
     {
