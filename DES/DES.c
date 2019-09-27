@@ -11,8 +11,6 @@
 #define KEY_FILE_OPEN_ERROR -2
 #define CIPHER_FILE_OPEN_ERROR -3
 #define ILLEGAL_CIPHER_FILE -4
-#define ILLEGAL_KEY_FILE -5
-#define OK 1;
 
 //Table for initial permutation
 int IP_Table[64] = { 57, 49, 41, 33, 25, 17, 9, 1,
@@ -436,7 +434,8 @@ int DES_Encrypt(char *plainFile, char *key,char *cipherFile)
     {
         return PLAIN_FILE_OPEN_ERROR;
     }   
-    if((cipher = fopen(cipherFile,"wb")) == NULL)
+    //If the file does not exist, creat a new one, if exists, overwrite it
+    if((cipher = fopen(cipherFile,"wb+")) == NULL)
     {
         return CIPHER_FILE_OPEN_ERROR;
     }
@@ -465,7 +464,7 @@ int DES_Encrypt(char *plainFile, char *key,char *cipherFile)
     }
     fclose(plain);
     fclose(cipher);
-return OK;
+return 0;
 }
 
 //Decrypt the file
@@ -481,7 +480,8 @@ int DES_Decrypt(char *cipherFile, char *key,char *plainFile)
     {
         return CIPHER_FILE_OPEN_ERROR;
     }
-    if((plain = fopen(plainFile,"wb")) == NULL)
+    //If the file does not exist, creat a new one, if exists, overwrite it
+    if((plain = fopen(plainFile,"wb+")) == NULL)
     {
         return PLAIN_FILE_OPEN_ERROR;
     }
@@ -529,17 +529,23 @@ int DES_Decrypt(char *cipherFile, char *key,char *plainFile)
     {
         fwrite(plainBlock,sizeof(char),8 - plainBlock[7],plain);
     }
-    else    //If not
+    //If not
+    else
     {
         fwrite(plainBlock,sizeof(char),8,plain);
     }
     fclose(plain);
     fclose(cipher);
-return OK;
+return 0;
 }
 
 int main(int argc, char *argv[])
-{    
+{   
+    if(argc != 5)
+    {
+        puts("Incorrect input form, please read README");
+        return 0;
+    } 
     if(strcmp(argv[1], "-d") == 0)
     {
         DES_Decrypt(argv[2], argv[3], argv[4]);
@@ -550,7 +556,7 @@ int main(int argc, char *argv[])
     }
     else
     {
-        puts("Wrong input form, Please try again.");
+        puts("Wrong flag, Please read README.");
     }
     return 0;
 

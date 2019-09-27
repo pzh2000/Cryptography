@@ -1,3 +1,0 @@
-To compile this program, simply type in "make" into the command line at the root directory of the project. 
-The client path will be ./bin/client/cli
-The server path will be ./bin/server/ser

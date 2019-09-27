@@ -5,4 +5,4 @@ CFLAG = -g -Wall
 DES: DES.c
 
 clean:
-	rm -f DES
+	rm -rf DES DES.dSYM
