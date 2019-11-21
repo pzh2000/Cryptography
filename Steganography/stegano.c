@@ -1,27 +1,7 @@
 /*
- * hidefy.c - Simple Steganography Utility
+ * Filename: Stegano.c
  *
- * MIT License
- *
- * Copyright (c) 2019 Nikola Knezevic
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- * 
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- * 
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * A program to implement steganogrphy based on Least Significant Bits (LSB) approach
  */
 
 #include <stdio.h>
@@ -36,7 +16,7 @@
 
 #pragma pack (push, 1)
 
-struct BMPHeader {
+struct ImageHeader {
 	uint16_t type;
 	uint32_t size;
 	uint16_t reserved1;
@@ -53,9 +33,9 @@ struct BMPHeader {
 
 #pragma pack (pop)
 
-struct BMPHeader header;
+struct ImageHeader header;
 
-/* extract and print to stdout */
+//Extract and print to stdout
 void extract (FILE * fp)
 {
 	size_t i, j, n = 100;
@@ -71,7 +51,7 @@ void extract (FILE * fp)
 		}
 		buffer[i] = low;
 		if (low == '\0') break;
-		/* expand buffer if neccessary */
+		//Wxpand buffer if neccessary
 		if (i == n - 1)
 		{
 			n = n * 2;
@@ -83,7 +63,7 @@ void extract (FILE * fp)
 	free (buffer);
 }
 
-/* embed message using LSB technique */
+//Embed message using LSB technique
 void embed (char * msg, FILE * in, FILE * out)
 {
 	uint8_t i, low, byte;
@@ -102,13 +82,13 @@ void embed (char * msg, FILE * in, FILE * out)
 	}
 }
 
-/* duplicate cover image */
+//Duplicate cover image
 int copy (FILE * src, FILE * dest)
 {
 	char buffer[4096];
 	size_t bytes_read;
 
-	/* read from beginning */
+	//Read from beginning
 	fseek (src, 0, SEEK_SET);
 	while (!feof (src))
 	{
@@ -132,7 +112,7 @@ int copy (FILE * src, FILE * dest)
 	return 1;
 }
 
-/* basic input file test */
+//Basic input file test
 int is_valid (FILE * fp)
 {
 	if (fp == NULL) 
@@ -141,17 +121,17 @@ int is_valid (FILE * fp)
 		return 0;
 	}
 
-	/* populate global BMPHeader struct */
+	//Populate global ImageHeader struct
 	fread (&header, sizeof (header), 1, fp);
 
-	if (header.type != MAGIC_VALUE) // BM
+	if (header.type != MAGIC_VALUE)
 	{
 		fprintf (stderr, "Not a bitmap\n");
 		fclose (fp);
 		return 0;
 	}
 
-	if (header.bit_depth != BIT_DEPTH) // truecolor
+	if (header.bit_depth != BIT_DEPTH) //Correct to true color
 	{
 		fprintf (stderr, "Cover image must have 24-bit color depth\n");
 		fclose (fp);
@@ -160,7 +140,7 @@ int is_valid (FILE * fp)
 	return 1;
 }
 
-/* append _stego suffix to image filename */
+//Append _stego suffix to image filename
 char * get_filename (char * cover)
 {
 	char * str = (char *) malloc (strlen (cover) + 7);
@@ -171,7 +151,7 @@ char * get_filename (char * cover)
 	return str;			
 }
 
-/* calculate if embedding is possible */
+//Calculate if embedding is possible
 int has_space (char * msg, FILE * fp)
 {
 	size_t bit_pairs = 4 * (strlen (msg) + 1);
@@ -193,21 +173,21 @@ int hide (char * msg, char * cover, char * out)
 	if (!is_valid (cover_fp) || !has_space (msg, cover_fp))
 		return EXIT_FAILURE;	
 	
-	/* append suffix if -o flag not specified */
+	//Append suffix if -o flag not specified
 	out_name = out ? out : get_filename (cover);
 	out_fp = fopen (out_name, "wr");
 
 	if (!copy (cover_fp, out_fp))
 		return EXIT_FAILURE;
 
-	/* jump to pixel array and start embedding */
+	//Jump to pixel array and start embedding
 	fseek (cover_fp, header.offset, SEEK_SET);
 	fseek (out_fp,   header.offset, SEEK_SET);
 	embed (msg, cover_fp, out_fp);
 	
 	printf ("File '%s' successfully created\n", out_name);
 
-	/* cleanup */
+	//Cleanup
 	if (!out) free (out_name);
 	fclose (cover_fp); fclose (out_fp);
 	return EXIT_SUCCESS;
@@ -219,7 +199,7 @@ int show (char * cover)
 	if (!is_valid (fp))
 		return EXIT_FAILURE;
 
-	/* jump to pixel array */
+	//Jump to pixel array
 	fseek (fp, header.offset, SEEK_SET);
 	extract (fp);
 	fclose (fp);
@@ -263,7 +243,7 @@ int main (int argc, char * argv[])
 		}	
 	}		
 
-	/* handle empty args, too many args, etc. */
+	//Handle empty args, too many args, etc.
 	if (optind == 1 || optind + 1 != argc 
 			|| (xflag && optind != 2))
 	{
@@ -271,7 +251,7 @@ int main (int argc, char * argv[])
 		return EXIT_FAILURE;
 	}
 
-	/* set remaining non-optional arguments */
+	//Set remaining non-optional arguments
 	cover_img = argv[optind];
 
 	if (xflag)
