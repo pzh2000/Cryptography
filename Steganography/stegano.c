@@ -4,259 +4,218 @@
  * A program to implement steganogrphy based on Least Significant Bits (LSB) approach
  */
 
+#include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
-#include <libgen.h>
 
-#define MAGIC_VALUE	0x4d42
-#define BIT_DEPTH	24	
+#define TRUE 1
+#define FALSE 0
+#define BMP_DATA_START 54 // Skip header
+#define ASCII_STX 0x02    // Start of text
+#define ASCII_ETX 0x03    // End of text
+#define PRINT_NONASCII_CHARS 1
 
-#pragma pack (push, 1)
+typedef unsigned char u8;
 
-struct ImageHeader {
-	uint16_t type;
-	uint32_t size;
-	uint16_t reserved1;
-	uint16_t reserved2;
-	uint32_t offset;
-	uint32_t header_size;
-	int32_t  px_width;
-	int32_t  px_height;
-	uint16_t num_planes;
-	uint16_t bit_depth;
-	uint32_t compression;
-	uint32_t img_size;
-};
+/*******************************************************
+ * Read file into buffer
+ *******************************************************/
+u8 read_file(char *name, u8 **buf, int *size) {
+  // Open file
+  int fd = 0;
+  if ((fd = open(name, O_RDONLY, 0)) < 0) {
+    printf("file open failed: %s\n", strerror(errno));
+    return FALSE;
+  }
 
-#pragma pack (pop)
+  // Get file size
+  *size = lseek(fd, 0, SEEK_END);
+  if (*size < 0) {
+    printf("file seek failed: %s\n", strerror(errno));
+    close(fd);
+    return FALSE;
+  }
+  if (lseek(fd, 0, SEEK_SET) < 0) {
+    printf("file seek failed: %s\n", strerror(errno));
+    close(fd);
+    return FALSE;
+  }
 
-struct ImageHeader header;
+  // Allocate and initialize buffer
+  *buf = malloc(sizeof(char) * *size);
+  if (*buf == NULL) {
+    close(fd);
+    printf("failed to allocate %d bytes: %s\n", *size, strerror(errno));
+    return FALSE;
+  }
 
-//Extract and print to stdout
-void extract (FILE * fp)
-{
-	size_t i, j, n = 100;
-	uint8_t * buffer, byte, low;
-	buffer = (uint8_t *) malloc (sizeof (*buffer) * n);
+  // Read file, print buffer
+  if (read(fd, *buf, *size) < 0) {
+    printf("file read failed: %s\n", strerror(errno));
+    close(fd);
+    free(buf);
+    return FALSE;
+  }
 
-	for (i = 0 ;; i++)
-	{
-		for (j = low = 0; j < 4; j++)
-		{
-			fread (&byte, sizeof (byte), 1, fp);
-			low |= (byte & 0x03) << j * 2;
-		}
-		buffer[i] = low;
-		if (low == '\0') break;
-		//Wxpand buffer if neccessary
-		if (i == n - 1)
-		{
-			n = n * 2;
-			buffer = (uint8_t *) realloc (buffer, n);
-		}
-	}
-
-	printf ("%s\n", buffer);
-	free (buffer);
+  // Clean up
+  close(fd);
+  return TRUE;
 }
 
-//Embed message using LSB technique
-void embed (char * msg, FILE * in, FILE * out)
-{
-	uint8_t i, low, byte;
-	uint8_t bitmask[] = { 0x03, 0x0C, 0x30, 0xC0 };
+/*******************************************************
+ * Write buffer to file
+ *******************************************************/
+u8 write_file(char *name, u8 *buf, int size) {
+  // Open file
+  int fd = 0;
+  if ((fd = open(name, O_CREAT | O_RDWR, S_IRWXU)) < 0) {
+    printf("file open failed: %s\n", strerror(errno));
+    return FALSE;
+  }
 
-	for (;;)
-	{
-		for (i = 0; i < 4; i++)
-		{
-			low = (*msg & bitmask[i]) >> i * 2;
-			fread (&byte, sizeof (byte), 1, in);
-			low += byte & 0xFC;
-			fwrite (&low, sizeof (low), 1, out);
-		}		
-		if (*msg++ == '\0') break;
-	}
+  // Write file
+  if (write(fd, buf, size) < 0) {
+    printf("file write failed: %s\n", strerror(errno));
+    close(fd);
+    return FALSE;
+  }
+
+  // Clean up
+  close(fd);
+  return TRUE;
 }
 
-//Duplicate cover image
-int copy (FILE * src, FILE * dest)
-{
-	char buffer[4096];
-	size_t bytes_read;
-
-	//Read from beginning
-	fseek (src, 0, SEEK_SET);
-	while (!feof (src))
-	{
-		bytes_read = fread (buffer, sizeof (char), 4096, src);
-		if (bytes_read < sizeof (buffer))
-		{
-			if (ferror (src))
-			{
-				fprintf (stderr, "Error reading from source\n");
-				fclose (src); fclose (dest);
-				return 0;
-			}
-		}
-		if (fwrite (buffer, sizeof (char), bytes_read, dest) != bytes_read)
-		{
-			fprintf (stderr, "Error writing to destination\n");
-			fclose (src); fclose (dest);
-			return 0;
-		}
-	}
-	return 1;
+/*******************************************************
+ * Encode character in LSB of 8bytes at offset in BMP
+ *******************************************************/
+void encodeChar(u8* bmp, int* offset, u8 character) {
+  // For each bit in character
+  for (u8 pos = 0; pos < 8; pos++) {
+    // Set LSB of BMP byte depending on bit at pos in character
+    if (character & (1 << pos))
+      bmp[*offset] |= 0x01; // 0000 0001
+    else
+      bmp[*offset] &= 0xFE; // 1111 1110
+    (*offset)++; // Next BMP byte
+  }
 }
 
-//Basic input file test
-int is_valid (FILE * fp)
-{
-	if (fp == NULL) 
-	{
-		fprintf (stderr, "Error opening cover image\n");
-		return 0;
-	}
+/*******************************************************
+ * Hide text file in bmp file
+ *******************************************************/
+void hide(char **argv) {
+  u8* bmp = NULL, *txt = NULL;
+  int bmp_size, txt_size;
 
-	//Populate global ImageHeader struct
-	fread (&header, sizeof (header), 1, fp);
+  // Load files into memory
+  if (!read_file(argv[2], &txt, &txt_size)) {
+    printf("Error loading %s\n", argv[2]);
+    return;
+  }
+  if (!read_file(argv[3], &bmp, &bmp_size)) {
+    printf("Error loading %s\n", argv[3]);
+    return;
+  }
 
-	if (header.type != MAGIC_VALUE)
-	{
-		fprintf (stderr, "Not a bitmap\n");
-		fclose (fp);
-		return 0;
-	}
+  // Is the BMP big enough to contain the text?
+  // txt_size + 1 to account for ETX marker
+  if ((bmp_size - BMP_DATA_START) / 8 < txt_size + 1) {
+    printf("BMP is too small to hide data\n");
+    return;
+  }
 
-	if (header.bit_depth != BIT_DEPTH) //Correct to true color
-	{
-		fprintf (stderr, "Cover image must have 24-bit color depth\n");
-		fclose (fp);
-		return 0;
-	}
-	return 1;
+  // Skip header
+  int bmp_offset = BMP_DATA_START;
+
+  // Mark start of hidden text with ASCII STX character
+  encodeChar(bmp, &bmp_offset, ASCII_STX);
+
+  // Encode each character from txt in bmp
+  for (int txt_idx = 0; txt_idx < txt_size; txt_idx++) {
+      encodeChar(bmp, &bmp_offset, txt[txt_idx]);
+  }
+
+  // Mark end of text with ASCII ETX character
+  encodeChar(bmp, &bmp_offset, ASCII_ETX);
+
+  // Write bmp to new file
+  if (!write_file("out.bmp", bmp, bmp_size)) {
+    printf("Error writing BMP file\n");
+  }
+
+  // Cleanup
+  free(bmp);
+  free(txt);
 }
 
-//Append _stego suffix to image filename
-char * get_filename (char * cover)
-{
-	char * str = (char *) malloc (strlen (cover) + 7);
-	char * ptr = str;
-	while (*cover != '.')
-		*ptr++ = *cover++;
-	strcpy (ptr, "_stego.bmp");
-	return str;			
+/*******************************************************
+ * Decode character from LSB of 8bytes at offset in BMP
+ *******************************************************/
+u8 decodeChar(u8* bmp, int* offset) {
+    u8 c = 0;
+    // For each bit in character
+    for (u8 pos = 0; pos < 8; pos++) {
+      // Write LSB of BMP byte to bit at pos in character
+      if (bmp[*offset] & 0x01)
+        c |= (1 << pos);
+      (*offset)++; // Next byte
+    }
+    return c;
 }
 
-//Calculate if embedding is possible
-int has_space (char * msg, FILE * fp)
-{
-	size_t bit_pairs = 4 * (strlen (msg) + 1);
-	if (bit_pairs > header.img_size)
-	{
-		fprintf (stderr, "Not enough space\n");
-		fclose (fp);
-		return 0;
-	}
-	return 1;	
+/*******************************************************
+ * Show hidden text in bmp
+ *******************************************************/
+void show(char **argv) {
+  u8 *bmp = NULL;
+  int bmp_size;
+
+  // Load file into memory
+  if (!read_file(argv[2], &bmp, &bmp_size)) {
+    printf("Error loading %s\n", argv[2]);
+    if (bmp)
+      free(bmp);
+    return;
+  }
+
+  // Skip header
+  int bmp_offset = BMP_DATA_START;
+
+  // Check for STX marker denoting hidden message
+  if(decodeChar(bmp, &bmp_offset) != ASCII_STX) {
+      free(bmp);
+      return;
+  }
+
+  // Decode until ETX reached
+  while (bmp_offset < bmp_size) {
+    u8 c = decodeChar(bmp, &bmp_offset);
+    if (c == ASCII_ETX)
+      break;
+    if (PRINT_NONASCII_CHARS || c < 128)
+      printf("%c", c);
+  }
+
+  // Clean up
+  free(bmp);
 }
 
-int hide (char * msg, char * cover, char * out)
-{
-	char * out_name;
-	FILE * cover_fp, * out_fp;
+/*******************************************************
+ * main
+ *******************************************************/
+int main(int argc, char *argv[]) {
+  if (argc == 3 && strncmp(argv[1], "show", 4) == 0)
+    show(argv);
+  else if (argc == 4 && strncmp(argv[1], "hide", 4) == 0)
+    hide(argv);
+  else
+    printf(
+        "Usage:\n stegano hide <text file> <bmp file>\n stegano show <bmp file>\n");
 
-	cover_fp = fopen (cover, "r");
-	if (!is_valid (cover_fp) || !has_space (msg, cover_fp))
-		return EXIT_FAILURE;	
-	
-	//Append suffix if -o flag not specified
-	out_name = out ? out : get_filename (cover);
-	out_fp = fopen (out_name, "wr");
-
-	if (!copy (cover_fp, out_fp))
-		return EXIT_FAILURE;
-
-	//Jump to pixel array and start embedding
-	fseek (cover_fp, header.offset, SEEK_SET);
-	fseek (out_fp,   header.offset, SEEK_SET);
-	embed (msg, cover_fp, out_fp);
-	
-	printf ("File '%s' successfully created\n", out_name);
-
-	//Cleanup
-	if (!out) free (out_name);
-	fclose (cover_fp); fclose (out_fp);
-	return EXIT_SUCCESS;
+  return 0;
 }
-
-int show (char * cover)
-{
-	FILE * fp = fopen (cover, "r");
-	if (!is_valid (fp))
-		return EXIT_FAILURE;
-
-	//Jump to pixel array
-	fseek (fp, header.offset, SEEK_SET);
-	extract (fp);
-	fclose (fp);
-	return EXIT_SUCCESS;
-}
-
-void print_usage (char * name)
-{
-	printf ("Usage:\n");
-	printf ("  %s -m string <cover_img> [-o <outfile>]\n", name);
-	printf ("  %s -x <stego_img>\n", name);
-	printf ("\nOptions:\n");
-	printf ("  -m	Secret text message to be embedded\n");
-	printf ("  -o	Optional path to the output bitmap file\n");
-	printf ("  -x	Extracts text from stego image to stdout\n"); 
-}
-
-int main (int argc, char * argv[])
-{
-	int c, xflag = 0;
-	char * cover_img, * secret_msg;
-	char * out_file = NULL;
-
-	while ((c = getopt (argc, argv, "m:o:x")) != -1)
-	{
-		switch (c)
-		{
-			case 'm':
-				secret_msg = optarg;
-				break;
-			case 'o':
-				out_file = optarg;
-				break;
-			case 'x':
-				xflag = 1;
-				break;
-			case '?':
-				return EXIT_FAILURE;
-			default:
-				abort ();	
-		}	
-	}		
-
-	//Handle empty args, too many args, etc.
-	if (optind == 1 || optind + 1 != argc 
-			|| (xflag && optind != 2))
-	{
-		print_usage (basename (argv[0]));
-		return EXIT_FAILURE;
-	}
-
-	//Set remaining non-optional arguments
-	cover_img = argv[optind];
-
-	if (xflag)
-		return show (cover_img);
-	else
-		return hide (secret_msg, cover_img , out_file);
-}
-
